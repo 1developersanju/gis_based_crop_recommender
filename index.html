@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoCrop: Smart Crop Recommendation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Roboto:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBg_Z0fpXfeVx2iwtYHRt614EDC8gqOOfc&callback=initMap" async defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Glassmorphic Container */
+        .glassmorphic {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+
+        .glassmorphic-strong {
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Header */
+        #app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            z-index: 2000;
+            background: rgba(255, 255, 255, 0.14);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #app-header h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: #ffffff;
+            margin-left: 12px;
+        }
+
+        /* Map Container */
+        #map {
+            height: 100vh;
+            width: 100%;
+            margin-top: 64px;
+        }
+
+        /* Floating Search Box */
+        #search-box {
+            position: fixed;
+            top: 80px;
+            left: 24px;
+            z-index: 1500;
+            min-width: 320px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 14px;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .icon-button {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(33, 150, 243, 0.8);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .icon-button:hover {
+            background: rgba(33, 150, 243, 1);
+            transform: scale(1.05);
+        }
+
+        .icon-button.primary {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        .icon-button.primary:hover {
+            background: rgba(76, 175, 80, 1);
+        }
+
+        .icon-button.orange {
+            background: rgba(255, 152, 0, 0.8);
+        }
+
+        .icon-button.orange:hover {
+            background: rgba(255, 152, 0, 1);
+        }
+
+        /* Floating Action Buttons */
+        .floating-buttons {
+            position: fixed;
+            right: 24px;
+            top: 80px;
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .fab {
+            min-width: 200px;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .fab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .fab.location {
+            background: rgba(33, 150, 243, 0.9);
+        }
+
+        .fab.draw {
+            background: rgba(255, 152, 0, 0.9);
+        }
+
+        /* Side Panels */
+        .side-panel {
+            position: fixed;
+            left: 24px;
+            top: 200px;
+            width: 360px;
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+            z-index: 1500;
+            display: none;
+        }
+
+        .side-panel.active {
+            display: block;
+        }
+
+        /* Right Side Panel for Recommendations */
+        .side-panel.right-panel {
+            left: auto;
+            right: 24px;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .panel-header h3 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .panel-content {
+            padding: 20px;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+            font-size: 20px;
+        }
+
+        .side-panel.collapsed .expand-icon {
+            transform: rotate(90deg);
+        }
+
+        .side-panel.collapsed .panel-content {
+            display: none;
+        }
+
+        /* Data Display */
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .data-row:last-child {
+            border-bottom: none;
+        }
+
+        .data-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .data-value {
+            font-family: 'Fira Mono', monospace;
+            font-size: 14px;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .copy-btn-small {
+            background: rgba(76, 175, 80, 0.6);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn-small:hover {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+        }
+
+        .data-table th {
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .data-table td {
+            color: #ffffff;
+            font-family: 'Fira Mono', monospace;
+        }
+
+        /* Buttons */
+        .main-button {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .main-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+        }
+
+        .main-button:active {
+            transform: translateY(0);
+        }
+
+        .action-button {
+            padding: 10px 16px;
+            background: rgba(156, 39, 176, 0.8);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .action-button:hover {
+            background: rgba(156, 39, 176, 1);
+        }
+
+        /* Recommendations List */
+        .recommendations-list {
+            list-style: none;
+            margin-top: 16px;
+        }
+
+        .recommendation-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .recommendation-card:hover {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+            transform: translateX(4px);
+        }
+
+        .recommendation-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4CAF50;
+            margin-bottom: 8px;
+        }
+
+        .recommendation-details {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+        }
+
+        .recommendation-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-right: 8px;
+            margin-top: 8px;
+        }
+
+        .badge-success {
+            background: rgba(40, 167, 69, 0.3);
+            color: #28a745;
+        }
+
+        .badge-info {
+            background: rgba(33, 150, 243, 0.3);
+            color: #2196f3;
+        }
+
+        /* Stepper */
+        .stepper {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1500;
+            display: flex;
+            gap: 16px;
+            padding: 16px 24px;
+            border-radius: 16px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .step.active {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .step.active .step-number {
+            background: #4CAF50;
+            color: white;
+        }
+
+        /* Feedback Banner */
+        .feedback-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 24px;
+            background: rgba(25, 118, 210, 0.9);
+            backdrop-filter: blur(8px);
+            text-align: center;
+            cursor: pointer;
+            z-index: 1500;
+            transition: all 0.3s ease;
+        }
+
+        .feedback-banner:hover {
+            background: rgba(25, 118, 210, 1);
+        }
+
+        /* Scrollbar */
+        .side-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .side-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .side-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .side-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #4CAF50;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Top Recommendation Highlight */
+        .recommendation-card.top-recommendation {
+            border: 2px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .recommendation-card.top-recommendation .recommendation-title {
+            font-size: 18px;
+            color: #4CAF50;
+        }
+
+        .top-badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .side-panel {
+                width: calc(100% - 48px);
+                max-width: 360px;
+            }
+
+            .floating-buttons {
+                right: 12px;
+                top: 80px;
+            }
+
+            .fab {
+                min-width: 160px;
+                font-size: 12px;
+                padding: 10px 12px;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-height: 85vh;
+            }
+        }
+
+        /* Coordinates Display - Bottom Right */
+        #coordinates-display {
+            position: fixed;
+            bottom: 80px;
+            right: 24px;
+            z-index: 1500;
+            min-width: 200px;
+            padding: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div id="app-header" class="glassmorphic">
+        <span class="material-icons" style="color: #4CAF50; font-size: 28px;">eco</span>
+        <h1>GeoCrop: Smart Crop Recommendation</h1>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Search Box -->
+    <div id="search-box" class="glassmorphic">
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Search coordinates or address">
+            <button class="icon-button" id="search-button" title="Search">
+                <span class="material-icons">search</span>
+            </button>
+        </div>
+        </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-buttons">
+        <button class="fab location" id="location-button">
+            <span class="material-icons">location_on</span>
+            <span>Use My Location</span>
+        </button>
+        <button class="fab draw" id="draw-polygon-button">
+            <span class="material-icons">crop_square</span>
+            <span>Draw Land Boundary</span>
+        </button>
+    </div>
+
+    <!-- Land Info Panel -->
+    <div id="land-info-panel" class="side-panel glassmorphic">
+        <div class="panel-header" onclick="togglePanel('land-info-panel')">
+            <span class="material-icons">terrain</span>
+            <h3>Selected Land</h3>
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+        <div class="panel-content">
+            <div class="data-row">
+                <span class="data-label">Latitude</span>
+                <span class="data-value">
+                    <span id="current-lat">11.759570</span>
+                    <button class="copy-btn-small" onclick="copyToClipboard('lat')">Copy</button>
+                </span>
+            </div>
+            <div class="data-row">
+                <span class="data-label">Longitude</span>
+                <span class="data-value">
+                    <span id="current-lng">79.325697</span>
+                    <button class="copy-btn-small" onclick="copyToClipboard('lng')">Copy</button>
+                </span>
+            </div>
+            <div class="data-row">
+                <span class="data-label">Area</span>
+                <span class="data-value" id="polygon-area">-</span>
+            </div>
+            <table class="data-table" id="land-meta-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="land-meta-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Soil & Climate Panel -->
+    <div id="soil-climate-panel" class="side-panel glassmorphic glassmorphic-strong">
+        <div class="panel-header" onclick="togglePanel('soil-climate-panel')">
+            <span class="material-icons">science</span>
+            <h3>Soil & Climate Properties</h3>
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+        <div class="panel-content">
+            <table class="data-table" id="soil-table">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="soil-table-body">
+                    <tr>
+                        <td colspan="2" class="loading">
+                            <div class="spinner"></div>
+                            <span>Click on map to load soil data</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button class="action-button" id="edit-soil-btn" style="display: none;">
+                <span class="material-icons" style="font-size: 16px;">edit</span>
+                <span>Edit Soil Values</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Crop Recommendation Panel (Left Side - Original) -->
+    <div id="crop-recommendation-panel" class="side-panel glassmorphic">
+        <div class="panel-header" onclick="togglePanel('crop-recommendation-panel')">
+            <span class="material-icons">eco</span>
+            <h3>Recommended Crops</h3>
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+        <div class="panel-content">
+            <button class="main-button" id="recommend-btn" onclick="getRecommendations()">
+                <span class="material-icons">play_circle</span>
+                <span>Get Crop Recommendations</span>
+            </button>
+            <ul class="recommendations-list" id="recs-list">
+                <li style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">
+                    No recommendations yet. Click the button above to get started.
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Crop Recommendations Panel (Right Side - Auto-display) -->
+    <div id="crop-recommendations-right" class="side-panel glassmorphic right-panel" style="display: none;">
+        <div class="panel-header" onclick="togglePanel('crop-recommendations-right')">
+            <span class="material-icons">eco</span>
+            <h3>Top Recommendations</h3>
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+        <div class="panel-content">
+            <div id="recommendations-loading" style="text-align: center; padding: 20px; color: rgba(255,255,255,0.6);">
+                <div class="spinner"></div>
+                <div style="margin-top: 10px;">Analyzing location...</div>
+            </div>
+            <ul class="recommendations-list" id="recs-list-right" style="display: none;">
+            </ul>
+            <button class="action-button" id="edit-values-btn" style="margin-top: 16px; width: 100%;">
+                <span class="material-icons" style="font-size: 16px;">edit</span>
+                <span>Edit Soil & Climate Values</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Coordinates Display -->
+    <div id="coordinates-display" class="glassmorphic" style="display: none;">
+        <div class="data-row">
+            <span class="data-label">Lat</span>
+            <span class="data-value" id="coord-lat">-</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Lng</span>
+            <span class="data-value" id="coord-lng">-</span>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="stepper glassmorphic">
+        <div class="step active" id="step-1">
+            <div class="step-number">1</div>
+            <span>Select Your Land</span>
+        </div>
+        <div class="step" id="step-2">
+            <div class="step-number">2</div>
+            <span>View Soil & Climate</span>
+        </div>
+        <div class="step" id="step-3">
+            <div class="step-number">3</div>
+            <span>Get Recommendations</span>
+        </div>
+    </div>
+
+    <!-- Feedback Banner -->
+    <div class="feedback-banner" onclick="alert('Feedback feature coming soon!')">
+        Have feedback or need support? Tap here!
+    </div>
+
+    <!-- Edit Values Modal -->
+    <div id="edit-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glassmorphic">
+            <div class="modal-header">
+                <h2>Edit Soil & Climate Values</h2>
+                <button class="modal-close" onclick="closeEditModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 24px; padding: 16px; background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 8px;">
+                    <label style="color: #4CAF50; font-weight: 600; margin-bottom: 8px; display: block;">
+                        <span class="material-icons" style="vertical-align: middle; font-size: 18px;">content_paste</span>
+                        Quick Fill: Paste List [N, P, K, Temperature, Humidity, pH, Rainfall]
+                    </label>
+                    <div style="display: flex; gap: 8px;">
+                        <input 
+                            type="text" 
+                            id="list-input" 
+                            placeholder="[67, 5, 100, 23.603016, 60.3, 7.42, 952]"
+                            class="form-input"
+                            style="flex: 1; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white;"
+                            onkeypress="if(event.key === 'Enter') parseListInput()"
+                        >
+                        <button 
+                            class="action-button" 
+                            onclick="parseListInput()"
+                            style="background: rgba(76, 175, 80, 0.8); white-space: nowrap;"
+                        >
+                            <span class="material-icons" style="font-size: 18px;">auto_fix_high</span>
+                            Fill Form
+                        </button>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 11px; color: rgba(255, 255, 255, 0.6);">
+                        Format: [N, P, K, Temperature, Humidity, pH, Rainfall]
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 0; margin-bottom: 16px; color: #4CAF50;">Soil Properties</h3>
+                <div class="form-group">
+                    <label>pH</label>
+                    <input type="number" id="edit-ph" step="0.1" min="0" max="14" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Nitrogen (N) - ppm</label>
+                    <input type="number" id="edit-nitrogen" step="1" min="0" max="200" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Phosphorus (P) - ppm</label>
+                    <input type="number" id="edit-phosphorus" step="1" min="0" max="150" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Potassium (K) - ppm</label>
+                    <input type="number" id="edit-potassium" step="1" min="0" max="250" class="form-input">
+                </div>
+                
+                <h3 style="margin-top: 24px; margin-bottom: 16px; color: #4CAF50;">Climate Properties</h3>
+                <div class="form-group">
+                    <label>Temperature Max (°C)</label>
+                    <input type="number" id="edit-temp-max" step="0.1" min="0" max="50" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Temperature Min (°C)</label>
+                    <input type="number" id="edit-temp-min" step="0.1" min="0" max="50" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Humidity (%)</label>
+                    <input type="number" id="edit-humidity" step="1" min="0" max="100" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Rainfall (mm)</label>
+                    <input type="number" id="edit-rainfall" step="1" min="0" max="500" class="form-input">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-button" onclick="closeEditModal()" style="background: rgba(158, 158, 158, 0.8);">
+                    Cancel
+                </button>
+                <button class="main-button" onclick="saveEditedValues()" style="margin: 0;">
+                    <span class="material-icons">save</span>
+                    <span>Save & Update Recommendations</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let currentPolygon = null;
+        let searchMarker = null;
+        let locationMarker = null;
+        let landMeta = {};
+        let soilData = {};
+        let drawingManager = null;
+        let isDrawing = false;
+
+        // Toggle panel
+        function togglePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            panel.classList.toggle('collapsed');
+        }
+
+        // Show panel
+        function showPanel(panelId) {
+            const panel = document.getElementById(panelId);
+            panel.classList.add('active');
+            panel.classList.remove('collapsed');
+        }
+
+        // Update coordinates display
+        function updateCoordinatesDisplay(lat, lng) {
+            document.getElementById('current-lat').textContent = lat.toFixed(6);
+            document.getElementById('current-lng').textContent = lng.toFixed(6);
+            document.getElementById('coord-lat').textContent = lat.toFixed(6);
+            document.getElementById('coord-lng').textContent = lng.toFixed(6);
+            document.getElementById('coordinates-display').style.display = 'block';
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(type) {
+            const elementId = type === 'lat' ? 'current-lat' : 'current-lng';
+            const value = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(value).then(() => {
+                const btn = event.target;
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#28a745';
+                setTimeout(() => {
+                    btn.textContent = original;
+                    btn.style.background = 'rgba(76, 175, 80, 0.6)';
+                }, 1000);
+            });
+        }
+
+        // Fetch soil data
+        async function fetchSoilData(meta) {
+            try {
+                const params = new URLSearchParams({
+                    district: meta.district_code || '',
+                    block: meta.taluk_code || '',
+                    village: meta.village_code || '',
+                    survey_no: meta.survey_number || ''
+                });
+                
+                const resp = await fetch('http://127.0.0.1:5000/soil-card', {
+                    method: 'POST',
+                    body: params
+                });
+                
+                const data = await resp.json();
+                if (data.success && data.soil) {
+                    return data.soil;
+            } else {
+                    // Fallback to average
+                    const avgResp = await fetch(`http://127.0.0.1:5000/soil-avg?taluk=${meta.taluk_name || ''}`);
+                    const avgData = await avgResp.json();
+                    return avgData.avg || {
+                        ph: 7.0,
+                        nitrogen: 140,
+                        phosphorus: 22,
+                        potassium: 170,
+                        moisture: 40
+                    };
+                }
+            } catch (e) {
+                console.error('Soil fetch error:', e);
+                return {
+                    ph: 7.0,
+                    nitrogen: 140,
+                    phosphorus: 22,
+                    potassium: 170,
+                    moisture: 40
+                };
+            }
+        }
+
+        // Fetch climate data
+        async function fetchClimate(lat, lng) {
+            try {
+                const resp = await fetch(`http://127.0.0.1:5000/climate?lat=${lat}&lng=${lng}`);
+                const data = await resp.json();
+                if (data.success && data.climate) {
+                    return data.climate;
+                }
+            } catch (e) {
+                console.error('Climate fetch error:', e);
+            }
+            return {
+                temperature_2m_max: 32,
+                temperature_2m_min: 24,
+                rainfall: 1200
+            };
+        }
+
+        // Display soil data
+        function displaySoilData() {
+            const tbody = document.getElementById('soil-table-body');
+            tbody.innerHTML = '';
+            
+            if (soilData.soil) {
+                Object.entries(soilData.soil).forEach(([key, value]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${key.charAt(0).toUpperCase() + key.slice(1)}</td>
+                        <td>${value}${key === 'ph' ? '' : key === 'moisture' ? '%' : ' ppm'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            if (soilData.climate) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>Avg Temp Max</td>
+                    <td>${soilData.climate.temperature_2m_max}°C</td>
+                `;
+                tbody.appendChild(row);
+            }
+
+            document.getElementById('edit-soil-btn').style.display = 'block';
+            showPanel('soil-climate-panel');
+            updateStep(2);
+        }
+
+        // Display land metadata
+        function displayLandMeta(meta) {
+            const tbody = document.getElementById('land-meta-body');
+            tbody.innerHTML = '';
+            
+            if (meta.survey_number) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>Survey No</td><td>${meta.survey_number}</td>`;
+                tbody.appendChild(row);
+            }
+            if (meta.village_name) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>Village</td><td>${meta.village_name}</td>`;
+                tbody.appendChild(row);
+            }
+            if (meta.taluk_name) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>Taluk</td><td>${meta.taluk_name}</td>`;
+                tbody.appendChild(row);
+            }
+            if (meta.district_name) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>District</td><td>${meta.district_name}</td>`;
+                tbody.appendChild(row);
+            }
+
+            if (tbody.children.length > 0) {
+                document.getElementById('land-meta-table').style.display = 'table';
+            }
+
+            showPanel('land-info-panel');
+        }
+
+        // Get recommendations (for left panel - manual trigger)
+        async function getRecommendations() {
+            const btn = document.getElementById('recommend-btn');
+            const list = document.getElementById('recs-list');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div><span>Analyzing...</span>';
+            list.innerHTML = '<li class="loading"><div class="spinner"></div><span>Getting recommendations...</span></li>';
+
+            try {
+                const resp = await fetch('http://127.0.0.1:5000/recommend', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(soilData)
+                });
+                
+                const data = await resp.json();
+                
+                if (data.success && data.recommendations) {
+                    list.innerHTML = '';
+                    data.recommendations.forEach((rec, index) => {
+                        const li = document.createElement('li');
+                        li.className = 'recommendation-card' + (index === 0 ? ' top-recommendation' : '');
+                        li.innerHTML = `
+                            ${index === 0 ? '<div class="top-badge">⭐ TOP RECOMMENDATION</div>' : ''}
+                            <div class="recommendation-title">${rec.crop}</div>
+                            <div class="recommendation-details">
+                                <span class="recommendation-badge badge-success">Suitability: ${rec.suitability}%</span>
+                                <span class="recommendation-badge badge-info">ROI: ${rec.roi}%</span>
+                                <span class="recommendation-badge badge-info">Season: ${rec.season}</span>
+                                ${rec.reason ? `<div style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.7);">${rec.reason}</div>` : ''}
+                            </div>
+                        `;
+                        list.appendChild(li);
+                    });
+                    updateStep(3);
+                } else {
+                    throw new Error('Invalid response from server');
+                }
+            } catch (error) {
+                console.error('Recommendations error:', error);
+                list.innerHTML = '<li style="color: #e57373; padding: 20px; text-align: center;">Error loading recommendations. Please try again.</li>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons">play_circle</span><span>Get Crop Recommendations</span>';
+            }
+        }
+
+        // Get recommendations for right panel (auto-trigger)
+        async function getRecommendationsRight() {
+            const loadingDiv = document.getElementById('recommendations-loading');
+            const list = document.getElementById('recs-list-right');
+            const rightPanel = document.getElementById('crop-recommendations-right');
+            
+            // Show panel and loading
+            rightPanel.style.display = 'block';
+            rightPanel.classList.add('active');
+            loadingDiv.style.display = 'block';
+            list.style.display = 'none';
+
+            try {
+                console.log('📤 Sending API request to /recommend');
+                console.log('Request body:', JSON.stringify(soilData, null, 2));
+                
+                const resp = await fetch('http://127.0.0.1:5000/recommend', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(soilData)
+                });
+                
+                if (!resp.ok) {
+                    throw new Error(`HTTP error! status: ${resp.status}`);
+                }
+                
+                const data = await resp.json();
+                
+                if (data.success && data.recommendations) {
+                    loadingDiv.style.display = 'none';
+                    list.style.display = 'block';
+                    list.innerHTML = '';
+                    
+                    console.log('✓ API Response received:', data);
+                    console.log('✓ Method used:', data.method);
+                    console.log('✓ Number of recommendations:', data.recommendations.length);
+                    console.log('✓ Primary crop:', data.primary_crop);
+                    
+                    // Show method badge
+                    const methodBadge = data.method === 'xgboost' ? 
+                        '<div style="background: rgba(76, 175, 80, 0.2); border: 1px solid #4CAF50; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; color: #4CAF50; text-align: center;">🤖 Using XGBoost ML Model (99% Accuracy)</div>' :
+                        data.method === 'ml_model' ?
+                        '<div style="background: rgba(33, 150, 243, 0.2); border: 1px solid #2196f3; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; color: #2196f3; text-align: center;">🤖 Using ML Model</div>' :
+                        '<div style="background: rgba(255, 152, 0, 0.2); border: 1px solid #ff9800; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; color: #ff9800; text-align: center;">📊 Using Rule-Based System</div>';
+                    list.innerHTML = methodBadge;
+                    
+                    // Show top 5 recommendations, with top one highlighted
+                    data.recommendations.slice(0, 5).forEach((rec, index) => {
+                        const li = document.createElement('li');
+                        li.className = 'recommendation-card' + (index === 0 ? ' top-recommendation' : '');
+                        li.innerHTML = `
+                            ${index === 0 ? '<div class="top-badge">⭐ TOP RECOMMENDATION</div>' : ''}
+                            <div class="recommendation-title">${rec.crop}</div>
+                            <div class="recommendation-details">
+                                <span class="recommendation-badge badge-success">Suitability: ${rec.suitability.toFixed(1)}%</span>
+                                <span class="recommendation-badge badge-info">ROI: ${rec.roi}%</span>
+                                <span class="recommendation-badge badge-info">Season: ${rec.season}</span>
+                                ${rec.reason ? `<div style="margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.7);">${rec.reason}</div>` : ''}
+                            </div>
+                        `;
+                        list.appendChild(li);
+                    });
+                    
+                    // Show edit button
+                    document.getElementById('edit-values-btn').style.display = 'flex';
+                    updateStep(3);
+                    
+                    console.log('✓ UI updated with new recommendations');
+                } else {
+                    throw new Error(data.error || 'Invalid response from server');
+                }
+            } catch (error) {
+                console.error('❌ Recommendations API error:', error);
+                loadingDiv.style.display = 'none';
+                list.style.display = 'block';
+                list.innerHTML = `<li style="color: #e57373; padding: 20px; text-align: center;">
+                    Error loading recommendations: ${error.message}<br>
+                    <small style="color: rgba(255,255,255,0.5);">Please check the console for details.</small>
+                </li>`;
+            }
+        }
+
+        // Update stepper
+        function updateStep(stepNum) {
+            for (let i = 1; i <= 3; i++) {
+                const step = document.getElementById(`step-${i}`);
+                if (i <= stepNum) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.remove('active');
+                }
+            }
+        }
+
+        // Edit modal functions
+        function openEditModal() {
+            const modal = document.getElementById('edit-modal');
+            
+            // Populate form with current values
+            if (soilData.soil) {
+                document.getElementById('edit-ph').value = soilData.soil.ph || 7.0;
+                document.getElementById('edit-nitrogen').value = soilData.soil.nitrogen || soilData.soil.N || 50;
+                document.getElementById('edit-phosphorus').value = soilData.soil.phosphorus || soilData.soil.P || 25;
+                document.getElementById('edit-potassium').value = soilData.soil.potassium || soilData.soil.K || 30;
+            }
+            
+            if (soilData.climate) {
+                document.getElementById('edit-temp-max').value = soilData.climate.temperature_2m_max || soilData.climate.temperature_max || 28;
+                document.getElementById('edit-temp-min').value = soilData.climate.temperature_2m_min || soilData.climate.temperature_min || 20;
+                document.getElementById('edit-humidity').value = soilData.climate.humidity || soilData.climate.humidity_2m || 65;
+                document.getElementById('edit-rainfall').value = soilData.climate.rainfall || soilData.climate.precipitation || 100;
+            }
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            // Clear list input
+            document.getElementById('list-input').value = '';
+        }
+        
+        function parseListInput() {
+            const input = document.getElementById('list-input');
+            const inputValue = input.value.trim();
+            
+            if (!inputValue) {
+                alert('Please enter a list of values');
+                return;
+            }
+            
+            try {
+                // Remove brackets if present and parse
+                let cleaned = inputValue.replace(/^\[|\]$/g, '').trim();
+                
+                // Split by comma and parse values
+                const values = cleaned.split(',').map(v => {
+                    const num = parseFloat(v.trim());
+                    if (isNaN(num)) {
+                        throw new Error(`Invalid number: ${v.trim()}`);
+                    }
+                    return num;
+                });
+                
+                if (values.length !== 7) {
+                    throw new Error(`Expected 7 values, got ${values.length}. Format: [N, P, K, Temperature, Humidity, pH, Rainfall]`);
+                }
+                
+                const [N, P, K, temperature, humidity, ph, rainfall] = values;
+                
+                // Fill soil properties
+                document.getElementById('edit-nitrogen').value = N;
+                document.getElementById('edit-phosphorus').value = P;
+                document.getElementById('edit-potassium').value = K;
+                document.getElementById('edit-ph').value = ph;
+                
+                // Fill climate properties
+                // For temperature, use the value as average and set max/min with ±4°C range
+                // This ensures (max + min) / 2 = temperature
+                let tempMax = temperature + 4;
+                let tempMin = temperature - 4;
+                // Clamp values to valid ranges
+                if (tempMax > 50) {
+                    tempMax = 50;
+                    tempMin = Math.max(0, (2 * temperature) - tempMax);
+                }
+                if (tempMin < 0) {
+                    tempMin = 0;
+                    tempMax = Math.min(50, (2 * temperature) - tempMin);
+                }
+                document.getElementById('edit-temp-max').value = tempMax.toFixed(1);
+                document.getElementById('edit-temp-min').value = tempMin.toFixed(1);
+                document.getElementById('edit-humidity').value = humidity;
+                document.getElementById('edit-rainfall').value = rainfall;
+                
+                // Visual feedback
+                input.style.borderColor = '#4CAF50';
+                input.style.boxShadow = '0 0 10px rgba(76, 175, 80, 0.5)';
+                setTimeout(() => {
+                    input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    input.style.boxShadow = 'none';
+                }, 2000);
+                
+                console.log('✓ Parsed list input and filled form:');
+                console.log(`  N: ${N}, P: ${P}, K: ${K}`);
+                console.log(`  Temperature: ${temperature}°C (max: ${tempMax.toFixed(1)}, min: ${tempMin.toFixed(1)})`);
+                console.log(`  Humidity: ${humidity}%, pH: ${ph}, Rainfall: ${rainfall}mm`);
+                
+            } catch (error) {
+                console.error('Error parsing list input:', error);
+                alert('Error parsing input: ' + error.message + '\n\nExpected format: [N, P, K, Temperature, Humidity, pH, Rainfall]\nExample: [67, 5, 100, 23.603016, 60.3, 7.42, 952]');
+                input.style.borderColor = '#f44336';
+                setTimeout(() => {
+                    input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                }, 2000);
+            }
+        }
+
+        async function saveEditedValues() {
+            const saveButton = document.querySelector('#edit-modal .main-button');
+            const originalButtonContent = saveButton.innerHTML;
+            
+            try {
+                // Show loading state on button
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<div class="spinner" style="margin-right: 8px; display: inline-block;"></div><span>Saving & Updating...</span>';
+                
+                // Get values from form
+                const editedSoil = {
+                    ph: parseFloat(document.getElementById('edit-ph').value) || 7.0,
+                    nitrogen: parseFloat(document.getElementById('edit-nitrogen').value) || 50,
+                    phosphorus: parseFloat(document.getElementById('edit-phosphorus').value) || 25,
+                    potassium: parseFloat(document.getElementById('edit-potassium').value) || 30
+                };
+                
+                const editedClimate = {
+                    temperature_2m_max: parseFloat(document.getElementById('edit-temp-max').value) || 28,
+                    temperature_2m_min: parseFloat(document.getElementById('edit-temp-min').value) || 20,
+                    humidity: parseFloat(document.getElementById('edit-humidity').value) || 65,
+                    rainfall: parseFloat(document.getElementById('edit-rainfall').value) || 100
+                };
+                
+                // Validate values
+                if (isNaN(editedSoil.ph) || editedSoil.ph < 0 || editedSoil.ph > 14) {
+                    throw new Error('pH must be a number between 0 and 14');
+                }
+                if (isNaN(editedClimate.temperature_2m_max) || isNaN(editedClimate.temperature_2m_min)) {
+                    throw new Error('Temperature values must be numbers');
+                }
+                if (editedClimate.temperature_2m_max < editedClimate.temperature_2m_min) {
+                    throw new Error('Maximum temperature must be greater than minimum temperature');
+                }
+                
+                // Update soilData
+                soilData.soil = editedSoil;
+                soilData.climate = editedClimate;
+                
+                console.log('✓ Updated soilData:', JSON.stringify(soilData, null, 2));
+                
+                // Update display
+                displaySoilData();
+                
+                // Close modal
+                closeEditModal();
+                
+                // Show loading in recommendations panel
+                const rightPanel = document.getElementById('crop-recommendations-right');
+                const loadingDiv = document.getElementById('recommendations-loading');
+                const list = document.getElementById('recs-list-right');
+                
+                rightPanel.style.display = 'block';
+                rightPanel.classList.add('active');
+                loadingDiv.style.display = 'block';
+                list.style.display = 'none';
+                
+                // Call API to get new recommendations and update UI
+                console.log('📤 Calling /recommend API with updated values...');
+                console.log('Request payload:', JSON.stringify(soilData, null, 2));
+                
+                await getRecommendationsRight();
+                
+                console.log('✓ Recommendations updated successfully in UI');
+                
+                // Re-enable button
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalButtonContent;
+                
+            } catch (error) {
+                console.error('❌ Error saving values:', error);
+                alert('Error saving values: ' + error.message + '\n\nPlease check the console for details.');
+                
+                // Re-enable button on error
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalButtonContent;
+            }
+        }
+
+        // Initialize edit button handlers (called from initMap)
+        function initEditHandlers() {
+            // Edit button in right panel
+            const editBtnRight = document.getElementById('edit-values-btn');
+            if (editBtnRight) {
+                editBtnRight.addEventListener('click', openEditModal);
+            }
+            
+            // Edit button in soil panel
+            const editBtnSoil = document.getElementById('edit-soil-btn');
+            if (editBtnSoil) {
+                editBtnSoil.addEventListener('click', openEditModal);
+            }
+            
+            // Close modal on overlay click
+            const modal = document.getElementById('edit-modal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeEditModal();
+                    }
+                });
+            }
+        }
+
+        // Fetch and plot land details
+        async function fetchAndPlotLandDetails(lat, lng) {
+            const body = new URLSearchParams({latitude: lat, longitude: lng, up: ''});
+            try {
+                const response = await fetch('http://127.0.0.1:5000/proxy', {
+                        method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: body
+                    });
+
+                    const data = await response.json();
+
+                if (data.success === 1 && data.data) {
+                    landMeta = data.data;
+                    displayLandMeta(landMeta);
+
+                    // Draw polygon
+                    if (data.data.geojson_geom) {
+                        try {
+                            const geojson = JSON.parse(data.data.geojson_geom);
+                        if (geojson.type === 'Polygon') {
+                                const coordinates = geojson.coordinates[0].map(coord => ({lat: coord[1], lng: coord[0]}));
+                                if (currentPolygon) currentPolygon.setMap(null);
+                            currentPolygon = new google.maps.Polygon({
+                                paths: coordinates,
+                                    strokeColor: '#4CAF50',
+                                strokeOpacity: 1.0,
+                                    strokeWeight: 3,
+                                    fillColor: '#4CAF50',
+                                    fillOpacity: 0.21
+                                });
+                            currentPolygon.setMap(map);
+                            const bounds = new google.maps.LatLngBounds();
+                            coordinates.forEach(coord => bounds.extend(coord));
+                            map.fitBounds(bounds);
+
+                                // Calculate area
+                                const area = google.maps.geometry.spherical.computeArea(currentPolygon.getPath());
+                                document.getElementById('polygon-area').textContent = (area / 10000).toFixed(2) + ' hectares';
+                            }
+                        } catch (geoError) {
+                            console.error('Error parsing GeoJSON:', geoError);
+                        }
+                    }
+
+                    // Fetch soil & climate
+                    try {
+                        soilData.soil = await fetchSoilData(landMeta);
+                        soilData.climate = await fetchClimate(lat, lng);
+                        displaySoilData();
+                        // Auto-trigger recommendations
+                        await getRecommendationsRight();
+                    } catch (soilError) {
+                        console.error('Error fetching soil/climate:', soilError);
+                    }
+                    }
+                } catch (error) {
+                    console.error('Error fetching land details:', error);
+                }
+        }
+
+        // Initialize map
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 11.759570, lng: 79.325697 },
+                zoom: 18,
+                mapTypeId: 'satellite',
+                styles: [
+                    {
+                        featureType: 'all',
+                        elementType: 'labels',
+                        stylers: [{ visibility: 'on' }]
+                    }
+                ]
+            });
+
+            map.addListener('center_changed', () => {
+                const center = map.getCenter();
+                updateCoordinatesDisplay(center.lat(), center.lng());
+            });
+
+            map.addListener('dragend', () => {
+                const center = map.getCenter();
+                updateCoordinatesDisplay(center.lat(), center.lng());
+            });
+
+            updateCoordinatesDisplay(11.759570, 79.325697);
+
+            // Click listener
+            map.addListener('click', async (event) => {
+                const lat = event.latLng.lat();
+                const lng = event.latLng.lng();
+                updateCoordinatesDisplay(lat, lng);
+                await fetchAndPlotLandDetails(lat, lng);
+            });
+
+            // Search
+            document.getElementById('search-button').addEventListener('click', searchCoordinates);
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchCoordinates();
+            });
+
+            // Location button
+            document.getElementById('location-button').addEventListener('click', getCurrentLocation);
+
+            // Draw polygon button
+            document.getElementById('draw-polygon-button').addEventListener('click', toggleDrawing);
+
+            // Initialize edit handlers
+            initEditHandlers();
+        }
+
+        // Get current location
+        function getCurrentLocation() {
+            const btn = document.getElementById('location-button');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons">hourglass_empty</span><span>Getting location...</span>';
+
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons">location_on</span><span>Use My Location</span>';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    updateCoordinatesDisplay(lat, lng);
+                    map.setCenter({ lat: lat, lng: lng });
+                    map.setZoom(18);
+                    
+                    if (locationMarker) locationMarker.setMap(null);
+                    locationMarker = new google.maps.Marker({
+                        position: { lat: lat, lng: lng },
+                        map: map,
+                        icon: {
+                            url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+                        }
+                    });
+                    
+                    await fetchAndPlotLandDetails(lat, lng);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-icons">location_on</span><span>Use My Location</span>';
+                },
+                (error) => {
+                    alert('Error getting location: ' + error.message);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-icons">location_on</span><span>Use My Location</span>';
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // Toggle drawing mode
+        function toggleDrawing() {
+            // Placeholder for drawing functionality
+            alert('Drawing mode coming soon!');
+        }
+
+        // Search coordinates
+        function parseCoordinates(input) {
+            const cleaned = input.trim();
+            const patterns = [
+                /^(-?\d+\.?\d*),(-?\d+\.?\d*)$/,
+                /^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/,
+                /^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/
+            ];
+            for (const pattern of patterns) {
+                const match = cleaned.match(pattern);
+                if (match) {
+                    const lat = parseFloat(match[1]);
+                    const lon = parseFloat(match[2]);
+                    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        return { lat, lon };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function searchCoordinates() {
+            const input = document.getElementById('search-input').value;
+            const coords = parseCoordinates(input);
+            if (coords) {
+                map.setCenter({ lat: coords.lat, lng: coords.lon });
+                map.setZoom(18);
+                updateCoordinatesDisplay(coords.lat, coords.lon);
+                if (searchMarker) searchMarker.setMap(null);
+                searchMarker = new google.maps.Marker({
+                    position: { lat: coords.lat, lng: coords.lon },
+                    map: map
+                });
+                fetchAndPlotLandDetails(coords.lat, coords.lon);
+            } else {
+                alert('Invalid format. Use: 11.759570, 79.325697');
+            }
+        }
+    </script>
+</body>
+</html>
